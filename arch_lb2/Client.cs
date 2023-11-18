@@ -26,7 +26,7 @@ namespace Client
         {
             client = new UdpClient();
             client.Connect(serverEP);
-            StartAsync().Wait(); // Дождитесь завершения StartAsync перед завершением конструктора
+            StartAsync().Wait();
         }
 
         private async Task StartAsync()
@@ -65,7 +65,7 @@ namespace Client
                     Console.WriteLine("Введите индекс элемента который хотите получить: ");
                     pars.Add("Index", Console.ReadLine());
                     break;
-                case RequestType.Post:
+                case RequestType.Add:
                     Console.WriteLine("Введите необходимые для создания элемента параметры: ");
 
                     Console.WriteLine("Введите название застройщика: ");
@@ -94,8 +94,8 @@ namespace Client
                     return RequestType.GetOne;
                 case "menu":
                     return RequestType.Menu;
-                case "post":
-                    return RequestType.Post;
+                case "add":
+                    return RequestType.Add;
                 default:
                     return RequestType.Uncorrect;
             }

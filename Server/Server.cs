@@ -2,10 +2,8 @@
 using NLog;
 using NLog.Config;
 using System;
-using System.ComponentModel.Design;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -14,6 +12,7 @@ namespace Server
     class Program
     {
         static void Main(string[] args)
+
         {
             LogManager.Configuration = new XmlLoggingConfiguration("NLog.config");
 
@@ -24,7 +23,7 @@ namespace Server
         }
         class Server
         {
-            private BuilderController builderController;
+            private DBController builderController;
             private int port;
             private UdpClient listener;
             private readonly Logger Logger;
@@ -32,13 +31,11 @@ namespace Server
             public Server(int _port)
             {
                 Logger = LogManager.GetCurrentClassLogger();
-
                 port = _port;
                 listener = new UdpClient(_port);
-                builderController = new BuilderController();
+                builderController = new DBController();
                 Logger.Info("Сервер запущен.");
-
-                builderController.ReadAllRecords();
+            
                 Task.Run(() => StartListenAsync());
             }
 
@@ -58,7 +55,9 @@ namespace Server
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex);
+                    Logger.Fatal(ex);
+                    await Console.Out.WriteLineAsync("Error");
+                    await Console.Out.WriteLineAsync(ex.ToString());
                 }
             }
 
@@ -67,12 +66,10 @@ namespace Server
             {
                 StringBuilder message = new StringBuilder(" Запрос получен"); ;
                 ResponseType responseType = ResponseType.Success;
-                // Десериализация запроса
                 string jsonRequest = Encoding.UTF8.GetString(requestData);
                 Request request = Request.Deserialize(jsonRequest);
 
-                // Обработка запроса (ваша логика здесь)
-                // ...
+
                 Console.Out.WriteLineAsync($"{request.MessageType}:{request.Message}");
                 switch (request.MessageType)
                 {
@@ -81,55 +78,57 @@ namespace Server
                         {
                             if (request.Parametrs.TryGetValue("Index", out string indexString) && int.TryParse(indexString, out int index))
                             {
-                                builderController.RemoveRecord(index);
-                                message = new StringBuilder("Запись успешно удалена.");
+                                Logger.Info("Запись удалена.");
+                                message = new StringBuilder(builderController.RemoveBuilder(index));
                                 responseType = ResponseType.Success;
-                                builderController.WriteRecords();
                             }
                             else
                             {
+                                Logger.Error($"Ошибка: Некорректный ID. Индекс = {indexString}");
                                 message = new StringBuilder("Ошибка: Некорректный формат индекса.");
                                 responseType = ResponseType.Error;
                             }
                         }
-                        catch (IndexOutOfRangeException ex)
+                        catch (Exception ex)
                         {
-                            Logger.Error(ex);
+                            Logger.Fatal(ex);
 
                             message = new StringBuilder($"Ошибка: Некорректный индекс");
                             responseType = ResponseType.Error;
                         }
                         break;
-                    case RequestType.GetAll:
-                        message = new StringBuilder();
-                        var list = builderController.GetBuilders();
-                        for (int index = 0; index < list.Count; index++)
-                        {
-                            message.Append($"Индекс : {index}" +
-                                $"\nНазвание : {list[index].Name}" +
-                                $"\nГород : {list[index].City}" +
-                                $"\nКоличество объектов : {list[index].NumberOfObjects}" +
-                                $"\nКоличество рабочих : {list[index].NumberOfWorkers}" +
-                                $"\nНаличие заказа : {list[index].HasOrder}" +
-                                $"\n----------------------------------\n");
-                        }
 
+                    case RequestType.GetAll:
+                        try
+                        {
+                            StringBuilder newlist = new StringBuilder();
+                            for (int i = 1; i <= builderController.GetLength(); i++)
+                            {
+                                string list = null;
+                                list = builderController.GetOneBuilderForAll(i);
+                                if (list != null)
+                                {
+                                    newlist.AppendLine(list);
+                                }
+                            }
+                            message = newlist;
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Fatal(ex);
+                            message = new StringBuilder($"Ошибка: {ex}");
+                            responseType = ResponseType.Error;
+                        }
                         break;
                     case RequestType.GetOne:
                         try
                         {
                             if (request.Parametrs.TryGetValue("Index", out string indexString) && int.TryParse(indexString, out int index))
                             {
-                                var el = builderController.GetBuilder(index);
-                                message = new StringBuilder($"Индекс : {index}" +
-                                $"\nНазвание : {el.Name}" +
-                                $"\nГород : {el.City}" +
-                                $"\nКоличество объектов : {el.NumberOfObjects}" +
-                                $"\nКоличество рабочих : {el.NumberOfWorkers}" +
-                                $"\nНаличие заказа : {el.HasOrder}" +
-                                $"\n----------------------------------");
+                                var one = builderController.GetOneBuilder(index);
+                                message = new StringBuilder(one);
                                 responseType = ResponseType.Success;
-                                builderController.WriteRecords();
+                                
                             }
                             else
                             {
@@ -137,15 +136,15 @@ namespace Server
                                 responseType = ResponseType.Error;
                             }
                         }
-                        catch (ArgumentOutOfRangeException ex)
+                        catch (Exception ex)
                         {
-                            Logger.Error(ex);
+                            Logger.Fatal(ex);
 
                             message = new StringBuilder($"Ошибка: Некорректный индекс");
                             responseType = ResponseType.Error;
                         }
                         break;
-                    case RequestType.Post:
+                    case RequestType.Add:
                         try
                         {
                             string name, address;
@@ -169,20 +168,20 @@ namespace Server
                                     NumberOfWorkers = numberOfWorkers,
                                     HasOrder = hasOrder
                                 };
-                                builderController.AddRecord(newBuilder);
-                                message = new StringBuilder("Запись успешно добавлена.");
+                                var ad = builderController.AddBuilder(newBuilder);
+                                message = new StringBuilder(ad);
                                 responseType = ResponseType.Success;
-                                builderController.WriteRecords();
                             }
                             else
                             {
+                                Logger.Error($"Ошибка: Некорректные параметры запроса. {request.Parametrs.ToString()}");
                                 message = new StringBuilder("Ошибка: Некорректные параметры запроса.");
                                 responseType = ResponseType.Error;
                             }
                         }
                         catch (Exception ex)
                         {
-                            Logger.Error(ex);
+                            Logger.Fatal(ex);
 
                             message = new StringBuilder($"Ошибка: {ex.Message}");
                             responseType = ResponseType.Error;
@@ -190,7 +189,7 @@ namespace Server
                         break;
 
                     case RequestType.Menu:
-                        message = new StringBuilder("Список команд:\n- delete\n- getAll\n- getOne\n- post\n- exit");
+                        message = new StringBuilder("Список команд:\n- getOne\n- getAll\n- add\n- delete\n- exit");
                         break;
                     case RequestType.Uncorrect:
                         responseType = ResponseType.Error;

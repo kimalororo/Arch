@@ -44,6 +44,6 @@ namespace Client
         Delete,
         GetAll,
         GetOne,
-        Post
+        Add
     }
 }
