@@ -23,13 +23,14 @@ namespace Server
             return (builders.Count + 1);
         }
 
-        //public string GetAllBuilders()
-        // {
-        //     StringBuilder builders = new StringBuilder();
-        //     for (int i = 0; i <= GetLength(); i++)
-        //         builders.Append(db.Builders.Find(i));
-        //     return builders.ToString();
-        // }
+        public string GetAllBuilders()
+        {
+            using (var dbContext = new BuilderContext())
+            {
+                List<Builder> builders = dbContext.Builders.ToList();
+                return JsonConvert.SerializeObject(builders);
+            }
+        }
         public string GetOneBuilderForAll(int id)
         {
             var builder = db.Builders.Find(id);
@@ -72,6 +73,19 @@ namespace Server
                 return JsonConvert.SerializeObject(new {Message = "Такой записи нет" });
             }
         }
-    }   
+        public string DeleteAndLoadData(List<Builder> builders)
+        {
+            using (var context = new BuilderContext())
+            {
+
+                var allEntities = context.Builders.ToList();
+                context.Builders.RemoveRange(allEntities);
+                context.Builders.AddRange(builders);
+                context.SaveChanges();
+                return JsonConvert.SerializeObject(builders);
+            }
+        }
+
+    }
 
 }

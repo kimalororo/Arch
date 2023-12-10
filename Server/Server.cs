@@ -1,9 +1,14 @@
-﻿using Client;
+﻿using ClientWPF;
+using Newtonsoft.Json;
 using NLog;
 using NLog.Config;
 using System;
+using System.Collections.Generic;
+using System.ComponentModel.Design;
+using System.Data.Entity;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -76,15 +81,15 @@ namespace Server
                     case RequestType.Delete:
                         try
                         {
-                            if (request.Parametrs.TryGetValue("Index", out string indexString) && int.TryParse(indexString, out int index))
+                            if (request.Parametrs.TryGetValue("Index", out string ID) && int.TryParse(ID, out int index))
                             {
                                 Logger.Info("Запись удалена.");
-                                message = new StringBuilder(builderController.RemoveBuilder(index));
+                                builderController.RemoveBuilder(index);
                                 responseType = ResponseType.Success;
                             }
                             else
                             {
-                                Logger.Error($"Ошибка: Некорректный ID. Индекс = {indexString}");
+                                Logger.Error(message: $"Ошибка: Некорректный ID");
                                 message = new StringBuilder("Ошибка: Некорректный формат индекса.");
                                 responseType = ResponseType.Error;
                             }
@@ -101,17 +106,9 @@ namespace Server
                     case RequestType.GetAll:
                         try
                         {
-                            StringBuilder newlist = new StringBuilder();
-                            for (int i = 1; i <= builderController.GetLength(); i++)
-                            {
-                                string list = null;
-                                list = builderController.GetOneBuilderForAll(i);
-                                if (list != null)
-                                {
-                                    newlist.AppendLine(list);
-                                }
-                            }
-                            message = newlist;
+                            message = new StringBuilder();
+                            var list = builderController.GetAllBuilders();
+                            message = new StringBuilder(list);
                         }
                         catch (Exception ex)
                         {
@@ -184,6 +181,23 @@ namespace Server
                             Logger.Fatal(ex);
 
                             message = new StringBuilder($"Ошибка: {ex.Message}");
+                            responseType = ResponseType.Error;
+                        }
+                        break;
+
+                    case RequestType.UpdateTable:
+                        try
+                        {
+                            var list = new List<Builder>();
+                            list = JsonConvert.DeserializeObject<List<Builder>>(request.Message);
+                            var response = builderController.DeleteAndLoadData(list);
+                            message = new StringBuilder(response);
+                            responseType = ResponseType.Success;
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Fatal(ex);
+                            message = new StringBuilder($"Ошибка: {ex}");
                             responseType = ResponseType.Error;
                         }
                         break;

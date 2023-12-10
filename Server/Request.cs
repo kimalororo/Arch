@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
-namespace Client
+namespace ClientWPF
 {
 
 
@@ -44,6 +44,7 @@ namespace Client
         Delete,
         GetAll,
         GetOne,
+        UpdateTable,
         Add
     }
 }
